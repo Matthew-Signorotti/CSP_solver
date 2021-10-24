@@ -5,44 +5,57 @@ MKDIR := mkdir -p
 RM := rm
 
 SRC_DIR := src
-C_FILES := $(shell find $(SRC_DIR) -name *.c)
-H_FILES := $(shell find $(SRC_DIR) -name *.h)
+EX_SRC_DIR := $(SRC_DIR)/examples
+EX_FILES := $(shell find $(EX_SRC_DIR) -name *.c)
+LIB_SRC_DIR := $(SRC_DIR)/library
+LIB_C_FILES := $(shell find $(LIB_SRC_DIR) -name *.c)
+LIB_H_FILES := $(shell find $(LIB_SRC_DIR) -name *.h)
 BLD_DIR := bld
-DEP_DIR := $(BLD_DIR)/dependencies
-INC_DIR := $(BLD_DIR)/include
-OBJ_DIR := $(BLD_DIR)/objects
-AR_TARGET := $(BLD_DIR)/libcspsolve.a
-DEP_TARGETS := $(C_FILES:$(SRC_DIR)/%.c=$(DEP_DIR)/%.d)
-INC_TARGETS := $(H_FILES:$(SRC_DIR)/%.h=$(INC_DIR)/%.h)
-OBJ_TARGETS := $(C_FILES:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+EX_BLD_DIR := $(BLD_DIR)/examples
+EX_TARGETS := $(EX_FILES:$(EX_SRC_DIR)/%.c=$(EX_BLD_DIR)/%.out)
+LIB_BLD_DIR := $(BLD_DIR)/library
+LIB_DEP_DIR := $(LIB_BLD_DIR)/dependencies
+LIB_INC_DIR := $(LIB_BLD_DIR)/include
+LIB_OBJ_DIR := $(LIB_BLD_DIR)/objects
+LIB_NAME := cspsolve
+LIB_TARGET := $(LIB_BLD_DIR)/lib$(LIB_NAME).a
+LIB_DEP_TARGETS := $(LIB_C_FILES:$(LIB_SRC_DIR)/%.c=$(LIB_DEP_DIR)/%.d)
+LIB_INC_TARGETS := $(LIB_H_FILES:$(LIB_SRC_DIR)/%.h=$(LIB_INC_DIR)/%.h)
+LIB_OBJ_TARGETS := $(LIB_C_FILES:$(LIB_SRC_DIR)/%.c=$(LIB_OBJ_DIR)/%.o)
 
-.PHONY : library objects dependencies headers style clean
+.PHONY : library objects dependencies headers examples style clean
 
-library : $(AR_TARGET)
+library : $(LIB_TARGET)
 
-$(AR_TARGET) : I = $(addprefix -I,$(dir $<))
-$(AR_TARGET) : $(OBJ_TARGETS) $(DEP_TARGETS) $(INC_TARGETS)
-	$(MKDIR) $(dir $(AR_TARGET))
-	$(AR) -crs $(AR_TARGET) $(OBJ_TARGETS)
+$(LIB_TARGET) : I = $(addprefix -I,$(dir $<))
+$(LIB_TARGET) : $(LIB_OBJ_TARGETS) $(LIB_DEP_TARGETS) $(LIB_INC_TARGETS)
+	$(MKDIR) $(dir $(LIB_TARGET))
+	$(AR) -crs $(LIB_TARGET) $(LIB_OBJ_TARGETS)
 
-objects : $(OBJ_TARGETS)
+objects : $(LIB_OBJ_TARGETS)
 
-$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
+$(LIB_OBJ_DIR)/%.o : $(LIB_SRC_DIR)/%.c
 	$(MKDIR) $(dir $@)
 	$(CC) $(I) -c $< -o $@
 
-dependencies : $(DEP_TARGETS)
+dependencies : $(LIB_DEP_TARGETS)
 
-$(DEP_DIR)/%.d : O_FILE = $(<:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-$(DEP_DIR)/%.d : $(SRC_DIR)/%.c
+$(LIB_DEP_DIR)/%.d : O_FILE = $(<:$(LIB_SRC_DIR)/%.c=$(LIB_OBJ_DIR)/%.o)
+$(LIB_DEP_DIR)/%.d : $(LIB_SRC_DIR)/%.c
 	$(MKDIR) $(dir $@)
 	$(CC) $(I) -MM -MQ $(O_FILE) -MF $@ $<
 
-headers : $(INC_TARGETS)
+headers : $(LIB_INC_TARGETS)
 
-$(INC_DIR)/%.h : $(SRC_DIR)/%.h
+$(LIB_INC_DIR)/%.h : $(LIB_SRC_DIR)/%.h
 	$(MKDIR) $(dir $@)
 	$(CP) $< $@
+
+examples : $(EX_TARGETS)
+
+$(EX_BLD_DIR)/%.out : $(EX_SRC_DIR)/%.c headers library
+	$(MKDIR) $(dir $@)
+	$(CC) -I$(LIB_INC_DIR) -L$(LIB_BLD_DIR) -l$(LIB_NAME) $< -o $@
 
 style :
 	clang-format --style=file -i $(SRC_DIR)/**
@@ -50,4 +63,4 @@ style :
 clean :
 	$(RM) -r $(BLD_DIR)
 
--include $(DEP_TARGETS)
+-include $(LIB_DEP_TARGETS)
